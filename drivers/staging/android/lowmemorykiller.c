@@ -44,7 +44,7 @@
 #include <linux/cpuset.h>
 
 static uint32_t lowmem_debug_level = 1;
-static int lowmem_adj[6] = {
+static short lowmem_adj[6] = {
 	0,
 	1,
 	6,
@@ -259,10 +259,10 @@ static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
 	int rem = 0;
 	int tasksize;
 	int i;
-	int min_score_adj = OOM_SCORE_ADJ_MAX + 1;
+	short min_score_adj = OOM_SCORE_ADJ_MAX + 1;
 	int minfree = 0;
 	int selected_tasksize = 0;
-	int selected_oom_score_adj;
+	short selected_oom_score_adj;
 	int array_size = ARRAY_SIZE(lowmem_adj);
 	int other_free;
 	int other_file;
@@ -312,7 +312,7 @@ static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
 	rcu_read_lock();
 	for_each_process(tsk) {
 		struct task_struct *p;
-		int oom_score_adj;
+		short oom_score_adj;
 
 		if (tsk->flags & PF_KTHREAD)
 			continue;
@@ -506,7 +506,7 @@ __module_param_call(MODULE_PARAM_PREFIX, adj,
 		    S_IRUGO | S_IWUSR, -1);
 __MODULE_PARM_TYPE(adj, "array of int");
 #else
-module_param_array_named(adj, lowmem_adj, int, &lowmem_adj_size,
+module_param_array_named(adj, lowmem_adj, short, &lowmem_adj_size,
 			 S_IRUGO | S_IWUSR);
 #endif
 module_param_array_named(minfree, lowmem_minfree, uint, &lowmem_minfree_size,
