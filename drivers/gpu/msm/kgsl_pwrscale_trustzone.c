@@ -49,26 +49,19 @@ spinlock_t tz_lock;
 #define TZ_UPDATE_ID		0x4
 #define TZ_INIT_ID		0x6
 
-unsigned long window_time = 0;
-unsigned long sample_time_ms = 100;
 unsigned int up_threshold = 50;
 unsigned int down_threshold = 25;
 unsigned int up_differential = 10;
 bool debug = 0;
 
-module_param(sample_time_ms, long, 0664);
 module_param(up_threshold, int, 0664);
 module_param(down_threshold, int, 0664);
 module_param(debug, bool, 0664);
 
-struct clk_scaling_stats {
-	unsigned long total_time_ms;
-	unsigned long busy_time_ms;
+static struct clk_scaling_stats {
 	unsigned long threshold;
 	unsigned int load;
 } gpu_stats = {
-	.total_time_ms = 0,
-	.busy_time_ms = 0,
 	.threshold = 0,
 	.load = 0,
 };
@@ -158,13 +151,20 @@ static void tz_idle(struct kgsl_device *device, struct kgsl_pwrscale *pwrscale)
 	if (stats.total_time == 0 || priv->bin.busy_time < FLOOR)
 		return;
 
-	if (time_is_after_jiffies(window_time + msecs_to_jiffies(sample_time_ms)))
-		return;
-
 	if (stats.busy_time >= 1 << 24 || stats.total_time >= 1 << 24) 
 	{
 		stats.busy_time >>= 7;
 		stats.total_time >>= 7;
+	}
+
+	/*
+	 * If there is an extended block of busy processing,
+	 * increase frequency. Otherwise run the normal algorithm.
+	 */
+	if (priv->bin.busy_time > CEILING) 
+	{
+		kgsl_pwrctrl_pwrlevel_change(device, pwr->max_pwrlevel);
+		goto clear;
 	}
 
 	gpu_stats.load = (100 * priv->bin.busy_time);
@@ -196,9 +196,9 @@ static void tz_idle(struct kgsl_device *device, struct kgsl_pwrscale *pwrscale)
 					     pwr->active_pwrlevel - 1);
 	}
 
+clear:
 	priv->bin.total_time = 0;
 	priv->bin.busy_time = 0;
-	window_time = jiffies;
 }
 
 static void tz_busy(struct kgsl_device *device,
@@ -213,9 +213,7 @@ static void tz_sleep(struct kgsl_device *device,
 	struct tz_priv *priv = pwrscale->priv;
 	struct kgsl_pwrctrl *pwr = &device->pwrctrl;
 
-	/* Do not ramp down forcelfully if the load is still above down_threshold */
-	if (gpu_stats.load < down_threshold)
-		kgsl_pwrctrl_pwrlevel_change(device, pwr->min_pwrlevel);
+	kgsl_pwrctrl_pwrlevel_change(device, pwr->min_pwrlevel);
 
 	if (debug)
 	{
@@ -225,7 +223,6 @@ static void tz_sleep(struct kgsl_device *device,
 
 	priv->bin.total_time = 0;
 	priv->bin.busy_time = 0;
-	window_time = jiffies;
 
 	return;
 }
@@ -233,36 +230,16 @@ static void tz_sleep(struct kgsl_device *device,
 #ifdef CONFIG_MSM_SCM
 static int tz_init(struct kgsl_device *device, struct kgsl_pwrscale *pwrscale)
 {
-	int i = 0, j = 1, ret = 0;
 	struct tz_priv *priv;
-	struct kgsl_pwrctrl *pwr = &device->pwrctrl;
-	unsigned int tz_pwrlevels[KGSL_MAX_PWRLEVELS + 1];
-
-	gpu_stats.total_time_ms = 0;
-	gpu_stats.busy_time_ms = 0;
-	gpu_stats.threshold = 0;
 
 	priv = pwrscale->priv = kzalloc(sizeof(struct tz_priv), GFP_KERNEL);
 	if (pwrscale->priv == NULL)
 		return -ENOMEM;
-	priv->idle_dcvs = 0;
+
 	priv->governor = TZ_GOVERNOR_INTERACTIVE;
 	spin_lock_init(&tz_lock);
 	kgsl_pwrscale_policy_add_files(device, pwrscale, &tz_attr_group);
-	for (i = 0; i < pwr->num_pwrlevels - 1; i++) {
-		if (i == 0)
-			tz_pwrlevels[j] = pwr->pwrlevels[i].gpu_freq;
-		else if (pwr->pwrlevels[i].gpu_freq !=
-				pwr->pwrlevels[i - 1].gpu_freq) {
-			j++;
-			tz_pwrlevels[j] = pwr->pwrlevels[i].gpu_freq;
-		}
-	}
-	tz_pwrlevels[0] = j;
-	ret = scm_call(SCM_SVC_DCVS, TZ_INIT_ID, tz_pwrlevels,
-				sizeof(tz_pwrlevels), NULL, 0);
-	if (ret)
-		priv->idle_dcvs = 1;
+
 	return 0;
 }
 #else
