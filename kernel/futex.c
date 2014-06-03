@@ -837,9 +837,7 @@ lookup_pi_state(u32 uval, struct futex_hash_bucket *hb,
 					 * Take a ref on the state and
 					 * return. [4]
 					 */
-					atomic_inc(&pi_state->refcount);
-					*ps = pi_state;
-					return 0;
+					goto out_state;
 				}
 
 				/*
@@ -851,11 +849,8 @@ lookup_pi_state(u32 uval, struct futex_hash_bucket *hb,
 				 *
 				 * Take a ref on the state and return. [6]
 				 */
-				if (!pid) {
-					atomic_inc(&pi_state->refcount);
-					*ps = pi_state;
-					return 0;
-				}
+				if (!pid)
+					goto out_state;
 			} else {
 				/*
 				 * If the owner died bit is not set,
@@ -885,6 +880,7 @@ lookup_pi_state(u32 uval, struct futex_hash_bucket *hb,
 			if (task && pi_state->owner == task)
 				return -EDEADLK;
 
+		out_state:
 			atomic_inc(&pi_state->refcount);
 			*ps = pi_state;
 			return 0;
