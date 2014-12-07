@@ -135,10 +135,12 @@ static struct input_handler boost_input_handler = {
 
 static int __init init(void)
 {
+	int ret;
+
 	INIT_WORK(&touchboost_inputopen.inputopen_work, boost_input_open);
 
-	input_register_handler(&boost_input_handler);
+	ret = input_register_handler(&boost_input_handler);
 
-	return 0;
+	return ret;
 }
 late_initcall(init);
