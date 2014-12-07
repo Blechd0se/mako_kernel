@@ -35,6 +35,7 @@
 #define HIGH_LOAD_COUNTER	25
 #define SAMPLING_RATE		2
 #define DEFAULT_MIN_ONLINE	2
+#define DEFAULT_UP_FREQUENCY	1200000
 #define SMART_LOAD_CALC
 
 struct hotplug_data {
@@ -410,14 +411,11 @@ static struct kobject *hotplug_control_kobj;
 
 int __init aero_hotplug_init(void)
 {
-	struct cpufreq_policy policy;
-	int ret, cpu = 0;
+	int ret = 0;
 
 	hot_data = kzalloc(sizeof(*hot_data), GFP_KERNEL);
 	if (!hot_data)
 		return -ENOMEM;
-
-	cpufreq_get_policy(&policy, cpu);
 
 	hot_data->hotplug_sampling = SAMPLING_RATE;
 	hot_data->min_online_time = DEFAULT_MIN_ONLINE;
@@ -425,7 +423,7 @@ int __init aero_hotplug_init(void)
 	hot_data->all_cpus_threshold = DEFAULT_SECOND_LEVEL;
 	hot_data->low_latency = false;
 	hot_data->debug = false;
-	hot_data->up_frequency = policy.max;
+	hot_data->up_frequency = DEFAULT_UP_FREQUENCY;
 #ifdef CONFIG_EARLYSUSPEND
 	hot_data->battery_saver = true;
 #endif
@@ -466,7 +464,7 @@ int __init aero_hotplug_init(void)
 	INIT_DELAYED_WORK(&decide_hotplug, decide_hotplug_func);
 	queue_delayed_work_on(0, wq, &decide_hotplug, msecs_to_jiffies(20000));
 	
-	return 0;
+	return ret;
 }
 MODULE_AUTHOR("Francisco Franco <franciscofranco.1990@gmail.com>, "
 	      "Alexander Christ <alex.christ@hotmail.de");
