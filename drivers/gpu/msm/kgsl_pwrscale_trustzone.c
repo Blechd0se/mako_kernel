@@ -192,18 +192,12 @@ static void tz_idle(struct kgsl_device *device, struct kgsl_pwrscale *pwrscale)
 		gpu_stats.threshold = up_threshold;
 
 	if ((gpu_stats.busy_time_ms * 100) > (gpu_stats.total_time_ms * gpu_stats.threshold)) {
-		if (gpu_pref_counter < 100)
-			++gpu_pref_counter;
-
 		if (pwr->active_pwrlevel > pwr->max_pwrlevel)
 			kgsl_pwrctrl_pwrlevel_change(device,
 					     pwr->active_pwrlevel + 1);
 	}
 
 	else if ((gpu_stats.busy_time_ms * 100) < (gpu_stats.total_time_ms * down_threshold)) {
-		if (gpu_pref_counter > 0)
-			--gpu_pref_counter;
-
 		if (pwr->active_pwrlevel < pwr->max_pwrlevel)
 			kgsl_pwrctrl_pwrlevel_change(device,
 					     pwr->active_pwrlevel - 1);
