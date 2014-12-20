@@ -950,8 +950,6 @@ static ssize_t extract_entropy(struct entropy_store *r, void *buf,
 		if (!r->last_data_init) {
 			r->last_data_init = true;
 			spin_unlock_irqrestore(&r->lock, flags);
-			trace_extract_entropy(r->name, EXTRACT_SIZE,
-					      r->entropy_count, _RET_IP_);
 			xfer_secondary_pool(r, EXTRACT_SIZE);
 			extract_buf(r, tmp);
 			spin_lock_irqsave(&r->lock, flags);
