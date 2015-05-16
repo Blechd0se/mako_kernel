@@ -33,8 +33,8 @@
 #define DEFAULT_FIRST_LEVEL	80
 #define DEFAULT_SECOND_LEVEL	60
 #define HIGH_LOAD_COUNTER	25
-#define SAMPLING_RATE		2
-#define DEFAULT_MIN_ONLINE	2
+#define SAMPLING_RATE		4
+#define DEFAULT_MIN_ONLINE	1
 #define DEFAULT_UP_FREQUENCY	1200000
 #define SMART_LOAD_CALC
 
@@ -242,7 +242,7 @@ static inline void put_cpu_down(int cpu)
 		 */
 		for (i = 0; i < 2; i++) {
 			parent_load = get_load(i);
-			if (cpu_load >= parent_load &&
+			if (cpu_load > parent_load &&
 				cpufreq_quick_get(j) >= cpufreq_quick_get(i)) {
 				if (hot_data->debug)						
 					pr_info("[Hot-Plug]: Preventing CPU%u from offlining\n", j);
@@ -301,6 +301,11 @@ static inline void suspend_func(struct work_struct *work)
 {	 
 	int cpu;
 
+	/* cancel the hotplug work when the screen is off and flush the WQ */
+	flush_workqueue(wq);
+	cancel_delayed_work_sync(&decide_hotplug);
+	cancel_work_sync(&resume);
+
 	if (hot_data->battery_saver) {
 		for_each_online_cpu(cpu) 
 			if (cpu)
@@ -318,6 +323,8 @@ static inline void resume_func(struct work_struct *work)
 	/* Online only the second core */
 	if (hot_data->battery_saver)
 		set_cpu_up(1);
+
+	cancel_work_sync(&suspend);
 
 	/* Resetting Counters */
 	hot_data->counter[0] = 0;
